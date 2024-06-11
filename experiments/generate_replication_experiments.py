@@ -2,19 +2,19 @@ import fire
 import os
 
 def generate(seed, length, id_of_faulty, task, fault):
-    if not os.path.exists("experiments/hom_experiments/"):
-        os.mkdir("experiments/hom_experiments/")
-    if not os.path.exists(f"experiments/hom_experiments/{task}"):
-        os.mkdir(f"experiments/hom_experiments/{task}")
-    if not os.path.exists(f"experiments/hom_experiments/{task}/{fault}"):
-        os.mkdir(f"experiments/hom_experiments/{task}/{fault}")
+    if not os.path.exists("experiments/replication_experiments/"):
+        os.mkdir("experiments/replication_experiments/")
+    if not os.path.exists(f"experiments/replication_experiments/{task}"):
+        os.mkdir(f"experiments/replication_experiments/{task}")
+    if not os.path.exists(f"experiments/replication_experiments/{task}/{fault}"):
+        os.mkdir(f"experiments/replication_experiments/{task}/{fault}")
 
-    if not os.path.exists("data/hom_data/"):
-        os.mkdir("data/hom_data/")
-    if not os.path.exists(f"data/hom_data/{task}"):
-        os.mkdir(f"data/hom_data/{task}")
-    if not os.path.exists(f"data/hom_data/{task}/{fault}"):
-        os.mkdir(f"data/hom_data/{task}/{fault}")
+    if not os.path.exists("data/replication_data/"):
+        os.mkdir("data/replication_data/")
+    if not os.path.exists(f"data/replication_data/{task}"):
+        os.mkdir(f"data/replication_data/{task}")
+    if not os.path.exists(f"data/replication_data/{task}/{fault}"):
+        os.mkdir(f"data/replication_data/{task}/{fault}")
 
     if task == "SWARM_FORAGING":
         content = f"""
