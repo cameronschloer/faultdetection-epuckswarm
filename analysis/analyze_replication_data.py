@@ -13,30 +13,32 @@ def analyze_and_modify_file(filename):
     modified_lines = []
     current_clock = None
     
+    cache = []
+    did_vote = False
+    
     # Iterate through each line
     for line in lines:
         # Split the line by spaces
         parts = line.replace("\t", " ").replace("\n", " ").split(" ")
-        parts 
-        print(parts)
+        parts = [i for i in parts if i != ""]
 
-        # # Check for Clock line
-        # current_clock = int(parts[1])
-        # modified_lines.append(line)
-        # # Check if any value except "-1" is present
-        # if any(val != "-1" for val in parts[3:]):
-        #     # If yes, keep the line and the current clock
-        #     modified_lines.append(line)
-        # elif current_clock is not None:
-        #     # If no, check if a clock was previously found
-        #     # If a clock was found, keep all lines with that clock and reset
-        #     modified_lines.extend([line for line in lines if line.startswith(f"Clock: {current_clock}")])
-        #     current_clock = None
+        if current_clock != int(parts[1]):
+            current_clock = int(parts[1])
+            if did_vote:
+                modified_lines = modified_lines + cache
+            cache = []
+            cache.append(line)
+            did_vote = False
+        else:
+            cache.append(line)
+            tol_list = [vote for vote in parts[7:27] if vote != '-1']
+            attack_list = [vote for vote in parts[28:48] if vote != '-1']
+            did_vote = len(tol_list) != 0 or len(attack_list) != 0
     
     # Clear the file content and write modified lines
-    # file.seek(0)
-    # file.truncate()
-    # file.writelines(modified_lines)
+    file.seek(0)
+    file.truncate()
+    file.writelines(modified_lines)
 
 # Get the filename from command line arguments (assuming first argument after script name)
 if len(sys.argv) > 1:
@@ -47,5 +49,3 @@ else:
 
 # Call the function with the filename and print completion message
 analyze_and_modify_file(filename)
-
-print("File analysis and modification complete!")
