@@ -13,13 +13,7 @@ do
         for (( k = 0; k < 30; k ++ ))
         do
             SEED=$(($SEED + 1))
-
-            if [ ${TASK_TYPES[i]} == "SWARM_FORAGING" ]
-            then
-                python3 experiments/generate_experiments.py -- ${FAULT_TYPES[i]} $SEED --length=245 --led_bins=2 --lower=450 --upper=1250
-            else
-                python3 experiments/generate_hom.py $SEED --length=600 --id_of_faulty=15 ${TASK_TYPES[i]} ${FAULT_TYPES[j]}
-            fi
+            python3 experiments/generate_replication_experiments.py $SEED --length=600 --id_of_faulty=15 ${TASK_TYPES[i]} ${FAULT_TYPES[j]}
         done
     done
 done
