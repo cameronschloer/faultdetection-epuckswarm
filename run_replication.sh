@@ -4,37 +4,57 @@ task=${1:-'null'}
 fault=${2:-'null'}
 
 if [[ $task == 'null' ]]; then
-    dir="experiments/replication_experiments"
-    for task_dir in "$dir"/*
-    do
-        for fault_dir in "$task_dir"/*
-        do
-            for test_file in "$fault_dir"/*
-            do
-                if [[ -f "$test_file" ]]
-                then
-                    argos3 -z -c $test_file
-                fi
+    exp_dir="experiments/replication_experiments"
+    data_dir="data/replication_data"
+    dir_ls=($exp_dir $data_dir)
+
+    for dir in ${dir_ls[@]}; do
+        for task_dir in "$dir"/*; do
+            for fault_dir in "$task_dir"/*; do
+                for file in "$fault_dir"/*; do
+                    if [[ -f "$file" ]]; then
+                        if [[ "${file##*.}" == "argos" ]]; then
+                            argos3 -z -c $file
+                        elif [[ "${file##*.}" == "txt" ]]; then
+                            python3 analysis/analyze_replication_data.py $file
+                        fi
+                    fi
+                done
             done
         done
     done
 elif [[ $fault == 'null' ]]; then
-    task_dir="experiments/replication_experiments/$task"
-    for fault_dir in "$task_dir"/*
-    do
-        for test_file in "$fault_dir"/*
-        do
-            if [[ -f "$test_file" ]]; then
-                argos3 -z -c $test_file
-            fi
+    exp_dir="experiments/replication_experiments/$task"
+    data_dir="data/replication_data/$task"
+    dir_ls=($exp_dir $data_dir)
+
+    for task_dir in ${dir_ls[@]}; do
+        for fault_dir in "$task_dir"/*; do
+            for file in "$fault_dir"/*; do
+                if [[ -f "$file" ]]; then
+                    if [[ "${file##*.}" == "argos" ]]; then
+                        argos3 -z -c $file
+                    elif [[ "${file##*.}" == "txt" ]]; then
+                        python3 analysis/analyze_replication_data.py $file
+                    fi
+                fi
+            done
         done
     done
 else
-    fault_dir="experiments/replication_experiments/$task/$fault"
-    for test_file in "$fault_dir"/*
-    do
-        if [[ -f "$test_file" ]]; then
-            argos3 -z -c $test_file
-        fi
+    exp_dir="experiments/replication_experiments/$task/$fault"
+    data_dir="data/replication_data/$task/$fault"
+    dir_ls=($exp_dir $data_dir)
+
+    for fault_dir in ${dir_ls[@]}; do
+        for file in "$fault_dir"/*; do
+            if [[ -f "$file" ]]; then
+                if [[ "${file##*.}" == "argos" ]]; then
+                    argos3 -z -c $file
+                elif [[ "${file##*.}" == "txt" ]]; then
+                    python3 analysis/analyze_replication_data.py $file
+                fi
+            fi
+        done
     done
 fi
