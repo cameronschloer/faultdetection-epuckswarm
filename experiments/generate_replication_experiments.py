@@ -1,5 +1,4 @@
-import fire
-import os
+import sys, os
 
 def generate(seed, length, id_of_faulty, task, fault):
     if not os.path.exists("experiments/replication_experiments/"):
@@ -298,4 +297,4 @@ def generate(seed, length, id_of_faulty, task, fault):
         out.write(content)
 
 if __name__ == "__main__":
-    fire.Fire(generate)
+    generate(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
