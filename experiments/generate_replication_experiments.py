@@ -8,6 +8,8 @@ def generate(seed, length, id_of_faulty, task, fault):
     if not os.path.exists(f"experiments/replication_experiments/{task}/{fault}"):
         os.mkdir(f"experiments/replication_experiments/{task}/{fault}")
 
+    if not os.path.exists("data"):
+        os.mkdir("data")
     if not os.path.exists("data/replication_data/"):
         os.mkdir("data/replication_data/")
     if not os.path.exists(f"data/replication_data/{task}"):
