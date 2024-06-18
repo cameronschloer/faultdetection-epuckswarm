@@ -1,0 +1,20 @@
+#!/bin/bash
+
+#SBATCH -N 1
+#SBATCH -n 35
+#SBATCH --mem=1G
+#SBATCH -J "replicating immune fault detection"
+#SBATCH -p short
+#SBATCH -t 01:00:00
+
+
+TASK_TYPES=("SWARM_AGGREGATION" "SWARM_DISPERSION" "SWARM_FLOCKING" "SWARM_HOMING" "SWARM_FORAGING")
+FAULT_TYPES=("FAULT_PROXIMITYSENSORS_SETMIN" "FAULT_PROXIMITYSENSORS_SETMAX" "FAULT_PROXIMITYSENSORS_SETRANDOM" "FAULT_RABSENSOR_SETOFFSET" "FAULT_ACTUATOR_LWHEEL_SETZERO" "FAULT_ACTUATOR_RWHEEL_SETZERO" "FAULT_ACTUATOR_BWHEELS_SETZERO")
+
+for (( i=0; i < ${#TASK_TYPES[@]}; i++ )); do
+    for (( j = 0; j < ${#FAULT_TYPES[@]}; j++ )); do
+        srun --exclusive --ntasks=1 --mem-per-cpu=1000M run_replication.sh ${TASK_TYPES[i]} ${FAULT_TYPES[j]} &
+    done
+done
+
+wait
