@@ -2,7 +2,7 @@
 
 #SBATCH -N 1
 #SBATCH -n 35
-#SBATCH --mem=1G
+#SBATCH --mem=35G
 #SBATCH -J "replicating immune fault detection"
 #SBATCH -p short
 #SBATCH -t 01:00:00
