@@ -13,7 +13,7 @@ project(faultdetection-epuckswarm)
 #   That's correct, but for some reason the CMake files they're looking for isn't readily available; you can
 #   uncomment them and try. It might work for you.
 ###################################
-set(ARGOS_COMPILE_QTOPENGL TRUE)
+set(ARGOS_COMPILE_QTOPENGL FALSE)
 set(CMAKE_BUILD_TYPE "Debug")
 
 if(APPLE)
