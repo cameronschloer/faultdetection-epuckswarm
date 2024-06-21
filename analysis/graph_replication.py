@@ -1,6 +1,15 @@
 import matplotlib.pyplot as plt
 import sys, os
 
+name_con = {
+    'FAULT_PROXIMITYSENSORS_SETMIN':'PMIN',
+    'FAULT_PROXIMITYSENSORS_SETMAX':'PMAX',
+    'FAULT_PROXIMITYSENSORS_SETRANDOM':'PRND',
+    'FAULT_RABSENSOR_SETOFFSET':'ROFS',
+    'FAULT_ACTUATOR_LWHEEL_SETZERO':'LACT',
+    'FAULT_ACTUATOR_RWHEEL_SETZERO':'RACT',
+    'FAULT_ACTUATOR_BWHEELS_SETZERO':'BACT'}
+
 def analyze_file(file_path):
     with open(file_path, "r") as file:
         lines = file.readlines()
@@ -35,16 +44,23 @@ def analyze_file(file_path):
     else:
         return 0.0
 
+def name_sorting(val):
+    name_of_fault, _ = val
+    _, list_of_dict_items = zip(*list(name_con.items()))
+    return list(list_of_dict_items).index(name_of_fault)
+
 def graph(data_path):
     for task in os.scandir(data_path):
-        fault_data = [(fault.name, [analyze_file(file) for file in os.scandir(fault)]) 
+        fault_data = [(name_con.get(fault.name), [analyze_file(file) for file in os.scandir(fault)]) 
                       for fault in os.scandir(task)]
+
+        fault_data.sort(key=name_sorting)
 
         names, data = zip(*fault_data)
 
         plt.title(task.name)
         plt.boxplot(data)
-        plt.xticks(range(1, len(names) + 1), names, rotation=15, fontsize=6)
+        plt.xticks(range(1, len(names) + 1), names, rotation=15, fontsize=10)
         plt.show()
 
 if __name__ == "__main__":
