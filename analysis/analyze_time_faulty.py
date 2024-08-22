@@ -1,53 +1,10 @@
-from collections import namedtuple
+import analysis_utils as au
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 import pandas as pd
 
-Dataline = namedtuple("Dataline", "time robot tolerators attackers")
-
-def parse_votes(token):
-	voters = []
-	for subtoken in token.split(' ')[1:]:
-		if subtoken == '-1' or subtoken == '' or subtoken == "\n":
-			break
-		voters.append(int(subtoken))
-	return voters
-
-def process_dataline(line):
-	"""
-	Processes a raw dataline into a dict of useful information
-	"""
-
-	if len(line.split('\t')) != 5:
-		return None # there is no data here 
-
-	
-	tokens = line.split('\t')
-	time = int(tokens[0].split(' ')[1])
-	robot = int(tokens[1].split(' ')[1])
-	tolerators = parse_votes(tokens[3])
-	attackers = parse_votes(tokens[4])
-
-	data = Dataline(time, robot, tolerators, attackers)
-
-	return data
-
-
-def process_file(file):
-	"""
-	Returns a list of processed datalines for the given file
-	"""
-
-	# Read in the data from the nohup.txt file
-	lines = []
-	with open(file, 'r') as datafile:
-		for line in datafile.readlines():
-			processed = process_dataline(line)
-			if processed is not None:
-				lines.append(processed)
-	return lines
 
 def experiment_details(file):
 	"""
@@ -66,8 +23,8 @@ def experiment_details(file):
 	return id_faulty.split(' '), injection_step.split(' '), num_robots, seed
 
 
-
-def time_sus(data: list[Dataline], num_robots):
+# TODO(Cameron): Make sure this doesn't accidentally count for the dead time inbetween each vote
+def time_sus(data: list[au.Dataline], num_robots):
 	"""
 	Returns the proportion of time the robot is considered faultly for each robot
 
@@ -119,7 +76,7 @@ def time_sus(data: list[Dataline], num_robots):
 def detailed_analysis_file(exp_file, nohup_file, dest=''):
 	id_faulty, injection_step, num_robots, seed = experiment_details(exp_file)
 	num_robots = int(num_robots)
-	time_data, first_times = time_sus(process_file(nohup_file), num_robots)
+	time_data, first_times = time_sus(au.process_file(nohup_file), num_robots)
 
 	injection_steps = np.zeros(num_robots)
 	injection_steps[np.array(id_faulty, dtype=int)] = np.array(injection_step)
@@ -145,18 +102,21 @@ def detailed_analysis_file(exp_file, nohup_file, dest=''):
 
 
 
-# if __name__ == "__main__":
-	# if len(sys.argv) < 3:
-	# 	raise Exception("usage python analysis_output.py <num_robots> <path>")
+if __name__ == "__main__":
+	if len(sys.argv) < 4:
+		raise Exception("usage python3 analyze_output.py <num_robots> <path_to_experiment_file> <path_to_data_file>")
+	
+	detailed_analysis_file(sys.argv[2], sys.argv[3], ".")
     
-	# data = process_file(sys.argv[2])
+	# data = au.process_file(sys.argv[3])
+	# print(data)
 	# time_faulty = time_sus(data, int(sys.argv[1]))
 	# print(time_faulty)
 
 	# tf15 = []
 	# for i in range(20):
 	# 	exp = str(i+1)
-	# 	data = process_file('original_data/SWARM_FORAGING/FAULT_ACTUATOR_LWHEEL_SETZERO/nohup_' + exp*3)
+	# 	data = au.process_file('original_data/SWARM_FORAGING/FAULT_ACTUATOR_LWHEEL_SETZERO/nohup_' + exp*3)
 	# 	time_faulty, _ = time_sus(data, 20)
 	# 	print(time_faulty)
 	# 	tf15.append(time_faulty[15])
