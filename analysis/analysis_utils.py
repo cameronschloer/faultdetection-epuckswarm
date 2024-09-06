@@ -1,6 +1,27 @@
 from collections import namedtuple
 
+# NUM_VIDEOS = 12
+# NUM_DUPLICATE_VIDEOS = 2
+# NUM_USERS = 34
+# NUM_EXPERIMENT_COLUMNS = 3
+# REVOKE_STR = "-Revoke"
+# BEACON_STR = "(beacon) "
+# UNKNOWN_STR = "unknown"
+# NA_STR = "nada"
+# NONE_STR = "NONE"
+# TIMESTAMP_COLUMN = 1
+# REASON_COLUMN = 2
+# MAX_NUM_ERRORS = 2
+# ROW_VALUE_COLUMN = 0
+
 Dataline = namedtuple("Dataline", "time robot tolerators attackers")
+
+def find_row_index(df, match_string, column_index, starting_row_index, max_row_search=100):
+	for i in range(max_row_search):
+		if match_string == df.iloc[starting_row_index+i,column_index]:
+			true_values_row_index = starting_row_index + i
+			return true_values_row_index
+	raise Exception(f"ERROR: In \"find_row_index\" the string: \"{match_string}\" was not found")
 
 def parse_votes(token):
 	voters = []

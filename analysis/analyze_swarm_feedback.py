@@ -46,7 +46,7 @@ def experiment_details(file):
 
 	seed = root.find('.//experiment').get('random_seed')
 
-	return fault_behavior, faulty_ids, injection_step.split(' '), num_led_bins, int(num_robots), seed
+	return fault_behavior.split(' '), faulty_ids, injection_step.split(' '), num_led_bins, int(num_robots), seed
 
 
 
@@ -126,39 +126,73 @@ def analyze_feedback_changes(color_changes):
 				analyzed_feedback[i].percent_time_green += percentage_time
 
 	return analyzed_feedback
-				
 
 
 
+def detailed_analysis_file(exp_file, nohup_file, dest=''):
+	fault_behaviors, faulty_ids, injection_steps, num_led_bins, num_robots, seed = experiment_details(exp_file)
+	if num_led_bins > 2:
+		raise Exception("Code not implemented for this many colors. You may want to change it!")
+	
+	all_fault_behaviors = ["n/a" for _ in range(num_robots)]
+
+	i = 0
+	for id in faulty_ids:
+		all_fault_behaviors[id] = fault_behaviors[i]
+		i += 1
+	color_changes = find_feedback_changes(data, num_robots)
+	analyzed_feedback = analyze_feedback_changes(color_changes)
+	# time_data, first_times = time_sus(au.process_file(nohup_file), num_robots)
+
+	injection_steps = np.zeros(num_robots)
+	injection_steps[np.array(faulty_ids, dtype=int)] = np.array(injection_steps)
+	time_ranges_black, time_ranges_red, time_ranges_green, num_times_black, num_times_red, num_times_green = [], [], [], [], [], []
+	num_times_changed, percent_time_black, percent_time_red, percent_time_green = [], [], [], []
+
+	for i in range(len(analyzed_feedback)):
+		time_ranges_black.append(analyzed_feedback[i].time_ranges_black)
+		time_ranges_red.append(analyzed_feedback[i].time_ranges_red)
+		time_ranges_green.append(analyzed_feedback[i].time_ranges_green)
+		num_times_black.append(analyzed_feedback[i].num_times_black)
+		num_times_red.append(analyzed_feedback[i].num_times_red)
+		num_times_green.append(analyzed_feedback[i].num_times_green)
+		num_times_changed.append(analyzed_feedback[i].num_times_changed)
+		percent_time_black.append(analyzed_feedback[i].percent_time_black)
+		percent_time_red.append(analyzed_feedback[i].percent_time_red)
+		percent_time_green.append(analyzed_feedback[i].percent_time_green)
+
+	data = {
+		'is_faulty': [str(robot) in faulty_ids for robot in range(num_robots)],
+		'fault_type': all_fault_behaviors,
+		'injection_step' : injection_steps,
+		'time_ranges_black': time_ranges_black,
+		'time_ranges_red': time_ranges_red,
+		'time_ranges_green': time_ranges_green,
+		'num_times_black': num_times_black,
+		'num_times_red': num_times_red,
+		'num_times_green': num_times_green,
+		'num_times_changed': num_times_changed,
+		'percent_time_black': percent_time_black,
+		'percent_time_red': percent_time_red,
+		'percent_time_green': percent_time_green
+	}
+	df = pd.DataFrame.from_dict(data, 'index')
+	df.to_json(dest+f'processed_data_{seed}.json')
 
 
-# def detailed_analysis_file(exp_file, nohup_file, dest=''):
-# 	fault_behavior, id_faulty, injection_step, num_led_bins, num_robots, seed = experiment_details(exp_file)
-# 	# time_data, first_times = time_sus(au.process_file(nohup_file), num_robots)
-
-# 	injection_steps = np.zeros(num_robots)
-# 	injection_steps[np.array(id_faulty, dtype=int)] = np.array(injection_step)
-# 	data = {
-# 		'is_faulty': [str(robot) in id_faulty for robot in range(num_robots)],
-# 		'injection_step' : injection_steps,
-# 		'time_found' : first_times,
-# 		'percent_time_found' : time_data
-# 	}
-# 	df = pd.DataFrame.from_dict(data, 'index')
-# 	df.to_json(dest+f'processed_data_{seed}.json')
-
-
+def extract_swarm_data_from_file(path_to_experiment_file, path_to_data_file):
+	data = au.process_file(path_to_data_file)
+	
+	fault_behavior, faulty_ids, injection_steps, num_led_bins, num_robots, seed = experiment_details(path_to_experiment_file)
+	
+	color_changes = find_feedback_changes(data, num_robots)
+	analyzed_feedback = analyze_feedback_changes(color_changes)
+	return analyzed_feedback
 
 
 if __name__ == "__main__":
 	if len(sys.argv) < 3:
-		raise Exception("usage python3 analyze_output.py <path_to_experiment_file> <path_to_data_file>")
+		raise Exception("usage: python3 analyze_output.py <path_to_experiment_file> <path_to_data_file>")
 	
-	
-	data = au.process_file(sys.argv[2])
-	
-	fault_behavior, faulty_ids, injection_steps, num_led_bins, num_robots, seed = experiment_details(sys.argv[1])
-	
-	color_changes = find_feedback_changes(data, num_robots)
-	analyzed_feedback = analyze_feedback_changes(color_changes)
+	analyzed_feedback = extract_swarm_data_from_file(sys.argv[1], sys.argv[2])
 	print(analyzed_feedback)
