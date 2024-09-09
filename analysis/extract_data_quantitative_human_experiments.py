@@ -2,14 +2,11 @@ import pandas as pd
 import analysis_utils as au
 from dataclasses import dataclass
 
-NUM_VIDEOS = 12
 NUM_DUPLICATE_VIDEOS = 2
-NUM_USERS = 34
 NUM_EXPERIMENT_COLUMNS = 3
 REVOKE_STR = "-Revoke"
 BEACON_STR = "(beacon) "
-UNKNOWN_STR = "unknown"
-NA_STR = "nada"
+# TODO(Cameron): Check that "NONE" actually didn't get replaced by unknown...
 NONE_STR = "NONE"
 TRUE_VALUES_STR = "True Values"
 TIMESTAMP_COLUMN = 1
@@ -17,31 +14,61 @@ REASON_COLUMN = 2
 MAX_NUM_ERRORS = 2
 ROW_VALUE_COLUMN = 0
 
+
 @dataclass
 class FaultyRobotGuess:
 	is_revoke: bool = False
 	robot_id: int = -1
 	timestamp: float = -0.1
 	reason: str = ""
-	  
-@dataclass   
-class VideoExperiment:
-	gueeses: list[FaultyRobotGuess]
-	true_values : list[FaultyRobotGuess]
+	reason_enum: au.FaultType = None
+	is_false_positive: bool = None
+
+@dataclass
+class VideoMetadata:
 	video_type: int = -1
 	seed: int = -1
 	user_watch_order: int = -1
+	num_faults: int = -1
+	num_robots: int = -1
+	are_leds_on: bool = None
+	  
+@dataclass   
+class VideoExperiment:
+	guesses: list[FaultyRobotGuess]
+	true_values: list[FaultyRobotGuess]
+	response_times: list[float]
+	metadata: VideoMetadata = VideoMetadata()
+	confusion_matrix: au.ConfusionMatrix = au.ConfusionMatrix()
 
 @dataclass   
 class UserQuantData:
 	video_experiments: list[VideoExperiment]
 	user_number: int = -1
+	
+def populate_metadata(video_type, seed, user_watch_order):
+	metadata = VideoMetadata(video_type=video_type, seed=seed, user_watch_order=user_watch_order)
+
+	LARGE_NUM_ROBOTS = 64
+	SMALL_NUM_ROBOTS = 16
+	SIZE_MODULO_NUM = 2
+	metadata.num_robots = SMALL_NUM_ROBOTS if video_type % SIZE_MODULO_NUM else LARGE_NUM_ROBOTS
+	
+	LEDS_MODULO_NUM = 4
+	LEDS_OFF_THRESHOLD = 2
+	metadata.are_leds_on = (video_type-1) % LEDS_MODULO_NUM < LEDS_OFF_THRESHOLD
+
+	FAULT_GROUPING_NUM = 4
+	metadata.num_faults = int((video_type-1)/FAULT_GROUPING_NUM)
+
+	return metadata
+
 
 def construct_faulty_robot_guess(df, rows, starting_row_index, column_index, user_num, video_type):
 	list_of_guesses = []
 	for i in rows:
 		robot_id = df.iloc[starting_row_index+i, column_index]
-		if UNKNOWN_STR == robot_id:
+		if au.UNKNOWN_STR == robot_id or NONE_STR == robot_id:
 			break
 		else:
 			is_revoke = False
@@ -49,15 +76,17 @@ def construct_faulty_robot_guess(df, rows, starting_row_index, column_index, use
 				robot_id = robot_id.replace(REVOKE_STR, "")
 				is_revoke = True
 			elif robot_id.startswith(BEACON_STR):
-				robot_id = robot_id.replace(BEACON_STR, "")
+				print("Beacon guess found")
+				continue
+				#robot_id = robot_id.replace(BEACON_STR, "")
 
 			timestamp = df.iloc[starting_row_index+i, column_index+TIMESTAMP_COLUMN]
 			try:
 				bad_robot_id = True
-				if NA_STR != robot_id and NONE_STR != robot_id:
+				if au.NA_STR != robot_id:
 					robot_id = int(robot_id)
 				bad_robot_id = False
-				if NA_STR != timestamp and NONE_STR != timestamp:
+				if au.NA_STR != timestamp:
 					timestamp = float(timestamp)
 			except ValueError:
 				blame_str = "robot_id" if bad_robot_id else "timestamp"
@@ -96,7 +125,7 @@ def extract_quant_data_from_csv(filename):
 
 	all_user_data = []
 
-	for i in range(1,NUM_USERS+1):
+	for i in range(1,au.NUM_USERS+1):
 		user_data = UserQuantData([], i)
 		user_str = "User " + str(i)
 		guess_row = df[df.iloc[:, ROW_VALUE_COLUMN].str.endswith(user_str)]
@@ -109,20 +138,21 @@ def extract_quant_data_from_csv(filename):
 		true_values_row_index = au.find_row_index(df, TRUE_VALUES_STR, ROW_VALUE_COLUMN, guess_row_index)
 		last_guess_row_index = true_values_row_index - 1
 		num_expected_duplicates = 0
-		for j in range(1,NUM_VIDEOS+1):
+		for j in range(1,au.NUM_VIDEOS+1):
 			column = "Video Type " + str(j)
 			column_index = df.columns.get_loc(column)
-			if UNKNOWN_STR == df.iloc[guess_row_index, column_index]:
+			if au.UNKNOWN_STR == df.iloc[guess_row_index, column_index]:
 				print(f"WARNING: No experiment data found for video type {j} for user {i}")
 				num_expected_duplicates += 1
 				continue
 
-			video_experiment = VideoExperiment([],[],video_type=j)
-			video_experiment.seed = df.iloc[guess_row_index, column_index]
+			video_experiment = VideoExperiment([],[],[])
+			seed = df.iloc[guess_row_index, column_index]
 
 			user_watch_str = df.iloc[guess_row_index, column_index+1]
-			user_watch_num = int(user_watch_str.replace("Exp ", ""))
-			video_experiment.user_watch_order = user_watch_num
+			user_watch_order = int(user_watch_str.replace("Exp ", ""))
+
+			video_experiment.metadata = populate_metadata(j, seed, user_watch_order)
 
 			video_experiment = construct_video_experiment(df, video_experiment, guess_row_index, last_guess_row_index, true_values_row_index, column_index, i, j)
 
@@ -133,29 +163,30 @@ def extract_quant_data_from_csv(filename):
 		for j in range(1,NUM_DUPLICATE_VIDEOS+1):
 			duplicate_column = "Video Type Duplicate " + str(j)
 			duplicate_column_index = df.columns.get_loc(duplicate_column)
-			if UNKNOWN_STR == df.iloc[guess_row_index, duplicate_column_index]:
+			if au.UNKNOWN_STR == df.iloc[guess_row_index, duplicate_column_index]:
 				continue
 			else:
 				num_duplicates += 1
 			
-			video_experiment = VideoExperiment([],[])
-			video_experiment.seed = df.iloc[guess_row_index, duplicate_column_index]
+			video_experiment = VideoExperiment([],[],[])
+			
+			seed = df.iloc[guess_row_index, duplicate_column_index]
 
 			user_watch_str = df.iloc[guess_row_index, duplicate_column_index+1]
-			user_watch_num = int(user_watch_str.replace("Exp ", ""))
-			video_experiment.user_watch_order = user_watch_num
+			user_watch_order = int(user_watch_str.replace("Exp ", ""))
 
 			video_type_str = df.iloc[guess_row_index, duplicate_column_index+2]
 			video_type_num = int(video_type_str.replace("Type ", ""))
-			video_experiment.video_type = video_type_num
+			
+			video_experiment.metadata = populate_metadata(video_type_num, seed, user_watch_order)
 
-			video_experiment = construct_video_experiment(df, video_experiment, guess_row_index, last_guess_row_index, true_values_row_index, duplicate_column_index, i, j)
+			video_experiment = construct_video_experiment(df, video_experiment, guess_row_index, last_guess_row_index, true_values_row_index, duplicate_column_index, i, video_type_num)
 
 
 			user_data.video_experiments.append(video_experiment)
 
-		if len(user_data.video_experiments) != NUM_VIDEOS:
-			print(f"WARNING: Expected user {user_data.user_number} to have {NUM_VIDEOS} videos, but they had {len(user_data.video_experiments)} videos")
+		if len(user_data.video_experiments) != au.NUM_VIDEOS:
+			print(f"WARNING: Expected user {user_data.user_number} to have {au.NUM_VIDEOS} videos, but they had {len(user_data.video_experiments)} videos")
 
 		if num_duplicates != num_expected_duplicates:
 			print(f"WARNING: Different expected number of duplicates and number of actual duplicates for user {user_data.user_number}, expected: {num_expected_duplicates}, actual: {num_duplicates}. This is most likely because the number of videos the user watched was not the expected value.")
@@ -169,6 +200,7 @@ def extract_quant_data_from_csv(filename):
 def main():
 	filename = '../data/user_study_user_data/quantitative_raw_results.csv'
 	data = extract_quant_data_from_csv(filename)
+	print(data)
 
 if __name__ == "__main__":
     main()

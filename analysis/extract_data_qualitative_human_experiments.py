@@ -3,17 +3,8 @@ import analysis_utils as au
 from dataclasses import dataclass
 
 
-NUM_VIDEOS = 12
-NUM_DUPLICATE_VIDEOS = 2
-NUM_USERS = 34
-NUM_EXPERIMENT_COLUMNS = 3
-REVOKE_STR = "-Revoke"
-BEACON_STR = "(beacon) "
-UNKNOWN_STR = "unknown"
 PREQUESTIONNAIRE_STR = "Pre-Questionnaire"
 POSTQUESTIONNAIRE_STR = "Post-Questionnaire"
-NA_STR = "nada"
-NONE_STR = "NONE"
 ROBOTICS_YEARS_STR = "Years w/ Robots in Simulation"
 VIDEO_GAMES_YEARS_STR = "Years Playing Video Games"
 STEM_YEARS_STR = "Years of STEM Education/Learning"
@@ -31,12 +22,7 @@ TRUST_STR = "Trust of Swarm Feedback"
 DIFFICULTY_STR = "Difficulty finding faulty robots"
 IMPROVE_INTERFACE_STR = "Anything to improve user interface?"
 QUESTIONS_OR_COMMENTS_STR = "Any other questions or comments?"
-TIMESTAMP_COLUMN = 1
-REASON_COLUMN = 2
-MAX_NUM_ERRORS = 2
-ROW_VALUE_COLUMN = 0
 FIRST_ROW = 0
-QUESTIONNAIRE_TYPE_COLUMN = 0
 QUESTION_COLUMN = 1
 NULL_INT = -1
 NULL_FLOAT = -0.1
@@ -121,12 +107,12 @@ class QuestionRows:
 
 def get_datum_from_df_cell(df, row_index, column_index, user_num, return_type):
 	datum = df.iloc[row_index, column_index]
-	if UNKNOWN_STR == datum:
+	if au.UNKNOWN_STR == datum:
 		print(f"WARNING: In get_datum_from_df_cell for user {user_num} on [{row_index}, {column_index}], got unknown string.")
 		return None
 
 	is_nada = False
-	if NA_STR == datum:
+	if au.NA_STR == datum:
 		is_nada = True
 
 	if return_type is int:
@@ -274,7 +260,7 @@ def extract_qual_data_from_csv(filename):
 	max_rows = len(df)
 	question_rows = populate_question_rows(df, max_rows)
 
-	for i in range(1,NUM_USERS+1):
+	for i in range(1,au.NUM_USERS+1):
 		user_data = UserQualData(user_number=i)
 		user_str = "User " + str(i)
 		user_column_index = df.columns.get_loc(user_str)
