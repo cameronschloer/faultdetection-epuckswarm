@@ -27,22 +27,18 @@ QUESTION_COLUMN = 1
 NULL_INT = -1
 NULL_FLOAT = -0.1
 NULL_STR = ""
-UNDECLARED_STR = "Undeclared"
-UNDECLARED_FLOAT = 0.0
-UNDECLARED_INT = -2
-UNDECLARED_BOOL = False
 
 
 @dataclass
 class NumAndComment:
-	num: float = UNDECLARED_FLOAT
-	comment: str = UNDECLARED_STR
+	num: float = None
+	comment: str = None
 
 
 @dataclass
 class BoolAndComment:
-	boolean: bool = UNDECLARED_BOOL
-	comment: str = UNDECLARED_STR
+	boolean: bool = None
+	comment: str = None
 
 
 @dataclass
@@ -56,9 +52,9 @@ class PreQuestionnaire:
 
 @dataclass
 class NasaTlxScale:
-	with_swarm_feedback: float = UNDECLARED_FLOAT
-	without_swarm_feedback: float = UNDECLARED_FLOAT
-	comment: str = UNDECLARED_STR
+	with_swarm_feedback: float = None
+	without_swarm_feedback: float = None
+	comment: str = None
 
 
 @dataclass   
@@ -73,36 +69,36 @@ class PostQuestionnaire:
 	feedback_ease_of_understanding: NumAndComment = NumAndComment()
 	trust_of_feedback: NumAndComment = NumAndComment()
 	finding_faulty_difficulty: NumAndComment = NumAndComment()
-	improve_interface: str = UNDECLARED_STR
-	other_comments_or_questions: str = UNDECLARED_STR
+	improve_interface: str = None
+	other_comments_or_questions: str = None
 
 
 @dataclass   
 class UserQualData:
 	pre_questionnaire: PreQuestionnaire = PreQuestionnaire()
 	post_questionnaire: PostQuestionnaire = PostQuestionnaire()
-	user_number: int = UNDECLARED_INT
+	user_number: int = None
 
 
 @dataclass   
 class QuestionRows:
-	robotics_years_row: int = UNDECLARED_INT
-	video_games_years_row: int = UNDECLARED_INT
-	stem_years_row: int = UNDECLARED_INT
-	help_row: int = UNDECLARED_INT
-	harm_row: int = UNDECLARED_INT
-	mental_demand_row: int = UNDECLARED_INT
-	physical_demand_row: int = UNDECLARED_INT
-	temporal_demand_row: int = UNDECLARED_INT
-	performance_row: int = UNDECLARED_INT
-	effort_row: int = UNDECLARED_INT
-	frustration_row: int = UNDECLARED_INT
-	feedback_usefulness_row: int = UNDECLARED_INT
-	feedback_ease_row: int = UNDECLARED_INT
-	trust_of_feedback_row: int = UNDECLARED_INT
-	difficulty_row: int = UNDECLARED_INT
-	improve_interface_row: int = UNDECLARED_INT
-	comments_or_questions_row: int = UNDECLARED_INT
+	robotics_years_row: int = None
+	video_games_years_row: int = None
+	stem_years_row: int = None
+	help_row: int = None
+	harm_row: int = None
+	mental_demand_row: int = None
+	physical_demand_row: int = None
+	temporal_demand_row: int = None
+	performance_row: int = None
+	effort_row: int = None
+	frustration_row: int = None
+	feedback_usefulness_row: int = None
+	feedback_ease_row: int = None
+	trust_of_feedback_row: int = None
+	difficulty_row: int = None
+	improve_interface_row: int = None
+	comments_or_questions_row: int = None
 
 
 def get_datum_from_df_cell(df, row_index, column_index, user_num, return_type):

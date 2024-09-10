@@ -48,19 +48,9 @@ class UserQuantData:
 	
 def populate_metadata(video_type, seed, user_watch_order):
 	metadata = VideoMetadata(video_type=video_type, seed=seed, user_watch_order=user_watch_order)
-
-	LARGE_NUM_ROBOTS = 64
-	SMALL_NUM_ROBOTS = 16
-	SIZE_MODULO_NUM = 2
-	metadata.num_robots = SMALL_NUM_ROBOTS if video_type % SIZE_MODULO_NUM else LARGE_NUM_ROBOTS
-	
-	LEDS_MODULO_NUM = 4
-	LEDS_OFF_THRESHOLD = 2
-	metadata.are_leds_on = (video_type-1) % LEDS_MODULO_NUM < LEDS_OFF_THRESHOLD
-
-	FAULT_GROUPING_NUM = 4
-	metadata.num_faults = int((video_type-1)/FAULT_GROUPING_NUM)
-
+	metadata.num_robots = au.find_swarm_size_by_video_type(video_type)
+	metadata.are_leds_on = au.find_leds_on_by_video_type(video_type)
+	metadata.num_faults = au.find_num_faults_by_video_type(video_type)
 	return metadata
 
 

@@ -13,7 +13,7 @@ class FaultType(Enum):
 	PROX_FAULT = 1
 	OTHER_VALID_FAULT = 2
 	NOT_A_FAULT = 3
-	
+
 @dataclass
 class ConfusionMatrix:
 	true_positives: int = 0
@@ -77,6 +77,25 @@ class ClassificationsOfCMs:
 	# The swarm will have less false negatives than the humans
 
 Dataline = namedtuple("Dataline", "time robot tolerators attackers")
+
+def find_swarm_size_by_video_type(video_type):
+	LARGE_NUM_ROBOTS = 64
+	SMALL_NUM_ROBOTS = 16
+	SIZE_MODULO_NUM = 2
+
+	num_robots = SMALL_NUM_ROBOTS if video_type % SIZE_MODULO_NUM else LARGE_NUM_ROBOTS
+	return num_robots
+
+def find_leds_on_by_video_type(video_type):
+	LEDS_MODULO_NUM = 4
+	LEDS_OFF_THRESHOLD = 2
+	are_leds_on = (video_type-1) % LEDS_MODULO_NUM < LEDS_OFF_THRESHOLD
+	return are_leds_on
+
+def find_num_faults_by_video_type(video_type):
+	FAULT_GROUPING_NUM = 4
+	num_faults = int((video_type-1)/FAULT_GROUPING_NUM)
+	return num_faults
 
 def find_row_index(df, match_string, column_index, starting_row_index, max_row_search=100):
 	for i in range(max_row_search):
