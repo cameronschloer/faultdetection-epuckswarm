@@ -15,8 +15,8 @@ do
     do
         for (( k = 0; k < 30; k ++ ))
         do
-            SEED=$(($SEED + 1))
             python3 experiments/generate_replication_experiments.py $SEED 600 15 ${TASK_TYPES[i]} ${FAULT_TYPES[j]}
+            SEED=$((($SEED + 1) % 20))
         done
     done
 done
