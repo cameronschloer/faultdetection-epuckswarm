@@ -6,6 +6,9 @@ import numpy as np
 from enum import Enum
 from dataclasses import dataclass
 import scipy.stats as stats
+from copy import deepcopy
+import statistics
+import pandas as pd
 
 
 MISSING_USER_NUM = 18
@@ -23,182 +26,9 @@ class ListsOfGroupings():
     user_lists: list[list] = None
     watch_order_lists: list[list] = None
 
-def calculate_response_times(experiment, correct_id):
-    match_found = False
-    guess_time, fault_injection_time = 0.0, 0.0
-    for i in range(len(experiment.guesses)):
-        if experiment.guesses[i].robot_id == correct_id and not experiment.guesses[i].is_revoke:
-            if type(experiment.guesses[i].timestamp) is float:
-                guess_time = experiment.guesses[i].timestamp
-                match_found = True
-                break
-            else:
-                print(type(experiment.guesses[i].timestamp))
-                print(f"WARNING: Match found in guesses, but the timestamp was not valid: {experiment.guesses[i].timestamp}, will try again to see if match exists later on")
-                continue
-
-    true_value_found = False
-    if match_found:
-        for i in range(len(experiment.true_values)):
-            if experiment.true_values[i].robot_id == correct_id:
-                true_value_found = True
-                if type(experiment.true_values[i].timestamp) is float:
-                    fault_injection_time = experiment.true_values[i].timestamp
-                    break
-                else:
-                    print(type(experiment.true_values[i].timestamp))
-                    raise ValueError(f"ERROR: Match found in true values, but the timestamp was not valid: {experiment.true_values[i].timestamp}")
-    else:
-        print(f"WARNING: No match found in calculate_response_times. This means there is an issue with the true positive that was detected")
-        return None
-                    
-    if true_value_found:
-        response_time = guess_time - fault_injection_time
-        return response_time
-    else:
-        raise ValueError(f"No true value found in calculate_response_times.")
-
-
-def populate_confusion_matrix(experiment):
-    # Focus on the hypothesis first, then try to explain those results, not just going looking for some new interesting find.
-    confusion_matrix = au.ConfusionMatrix()
-
-    confusion_matrix.total_robots = experiment.metadata.num_robots
-
-    actual_faulty_ids = []
-    for faulty_robot in experiment.true_values:
-        actual_faulty_ids.append(faulty_robot.robot_id)
-
-    guess_faulty_ids = set()
-    for guess_robot in experiment.guesses:
-        guess_faulty_ids.add(guess_robot.robot_id)
-
-    response_times = []
-    for guess_id in guess_faulty_ids:
-        if guess_id in actual_faulty_ids:
-            time_from_faulty = calculate_response_times(experiment, guess_id)
-            if time_from_faulty == None:
-                confusion_matrix.true_positives += 1
-            elif time_from_faulty < 0:
-                confusion_matrix.false_positives += 1
-                confusion_matrix.false_negatives += 1
-            else:
-                confusion_matrix.true_positives += 1
-                response_times.append(time_from_faulty)
-            
-        else:
-            confusion_matrix.false_positives += 1
-
-    for actual_id in actual_faulty_ids:
-        if actual_id not in guess_faulty_ids:
-            confusion_matrix.false_negatives += 1
-
-    num_total_robots = 64 if experiment.metadata.video_type % 2 == 0 else 16  # 64 for even, 16 for odd
-    num_faulty_robots = len(experiment.true_values)
-    confusion_matrix.true_negatives = (num_total_robots - num_faulty_robots) - confusion_matrix.false_positives
-
-    if num_faulty_robots != (confusion_matrix.true_positives + confusion_matrix.false_negatives):
-        raise ValueError("Cannot have a different number of faulty robots than the sum of true positives and false negatives")
-    
-    return confusion_matrix, response_times
-
-def populate_cm_for_each_experiment(data):
-    for i in range(len(data)):
-        print(f"Populating user {data[i].user_number}")
-        # Go through each video
-        for j in range(len(data[i].video_experiments)):
-            experiment = data[i].video_experiments[j]
-            data[i].video_experiments[j].confusion_matrix, data[i].video_experiments[j].response_times  = populate_confusion_matrix(experiment)
-
-    return data
-
 def calculate_percentage_confusion_matrix_times(data):
     pass
 
-def calculate_balanced_accuracy(tp, tn, fp, fn):
-    """Calculates balanced accuracy.
-
-    Args:
-        tp: True positives.
-        tn: True negatives.
-        fp: False positives.
-        fn: False negatives.
-
-    Returns:
-        Balanced accuracy.
-    """
-
-    try:
-        sensitivity = tp / (tp + fn)
-        specificity = tn / (tn + fp)
-
-        balanced_accuracy = (sensitivity + specificity) / 2
-
-        return balanced_accuracy
-
-    except ZeroDivisionError:
-        print("WARNING: No balanced accuracy could be found, division by Zero")
-        return None
-
-def calc_accuracy(tp, tn, total):
-    try:
-        accuracy = (tp+tn)/total
-        return accuracy
-    except ZeroDivisionError:
-        print("WARNING: No accuracy could be found, division by Zero")
-        return None
-
-def calc_f1_score(tp, fp, fn):
-    if tp == 0:
-        print("WARNING: tp equals zero!")
-    
-    try:
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
-        f1_score = 2 * (precision * recall) / (precision + recall)
-        return f1_score
-    except ZeroDivisionError:
-        print("WARNING: No F-Score could be found, division by Zero")
-        return None
-    
-
-def calc_matthews_coefficient(tp, fp, fn, tn):
-    """Calculates the Matthews correlation coefficient (MCC).
-
-    Args:
-        tp (int): True positives.
-        fp (int): False positives.
-        tn (int): True negatives.
-        fn (int): False negatives.
-
-    Returns:
-        float: The Matthews correlation coefficient.
-    """
-
-    numerator = (tp * tn) - (fp * fn)
-    denominator = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
-
-    if denominator == 0:
-        print("WARNING: mc's denominator was zero")
-        return None
-
-    mcc = numerator / denominator
-    return mcc
-
-
-def get_cm_metrics(cm):
-    tp = cm.true_positives
-    tn = cm.true_negatives
-    fp = cm.false_positives
-    fn = cm.false_negatives
-    total = cm.total_robots
-
-    accuracy = calc_accuracy(tp, tn, total)
-    f1_score = calc_f1_score(tp, fp, fn)
-    mcc = calc_matthews_coefficient(tp, fp, fn, tn)
-    bal_acc = calculate_balanced_accuracy(tp, tn, fp, fn)
-
-    return accuracy, f1_score, mcc, bal_acc
 
 
 def sum_confusion_matrices(cm1, cm2):
@@ -309,21 +139,29 @@ def gather_data_and_visualize_multiple_groups_of_data(data:quant.UserQuantData, 
 
     print("Metrics From Confusion Matrices")
     for i in range(len(grouped_cms)):   
-        accuracy, f1_score, mcc, bal_acc = get_cm_metrics(grouped_cms[i])
+        accuracy, f1_score, mcc, bal_acc = au.get_cm_metrics(grouped_cms[i])
         print(f"group {i}: ", accuracy, f1_score, mcc, bal_acc)
 
     group_num_list = range(1, len(grouped_resp_times_for_plotting)+1)
-    plt.boxplot(grouped_resp_times_for_plotting)
+    plt.boxplot(grouped_resp_times_for_plotting, showmeans=True)
     plt.title("Response Times (Human)")
-    plt.xlabel("LED Status")
+    plt.xlabel("Feedback")
     plt.ylabel("time (s)")
     plt.xticks(group_num_list, [f"Group {i}" for i in group_num_list])
     plt.show()
 
 
+def remove_zeros(list_to_remove_from):
+    list_with_no_zeros = [num for num in list_to_remove_from if num != 0]
+    return list_with_no_zeros
+
 def analyze_individual_cms_from_two_groups(data:quant.UserQuantData, data_grouping_type:DataGroupingType, group_one_head_list:ListsOfGroupings, group_two_head_list:ListsOfGroupings):
+    
     grouped_resp_times1, grouped_cms1 = gather_response_times_and_summed_cms(data, data_grouping_type, group_one_head_list)
     grouped_resp_times2, grouped_cms2 = gather_response_times_and_summed_cms(data, data_grouping_type, group_two_head_list)
+
+    print(grouped_cms1)
+    print(grouped_cms2)
 
     print(len(grouped_cms1))
 
@@ -338,18 +176,21 @@ def analyze_individual_cms_from_two_groups(data:quant.UserQuantData, data_groupi
     mccs1, mccs2 = [], []
     for i in range(len(grouped_cms1)):   
         print(f"Calculating group {i}")
-        accuracy1, f1_score1, mcc1, bal_acc1 = get_cm_metrics(grouped_cms1[i])
-        accs1.append(bal_acc1)
-        mccs1.append(mccs1)
-        print("Now group 2")
-        accuracy2, f1_score2, mcc2, bal_acc2 = get_cm_metrics(grouped_cms2[i])
-        accs2.append(bal_acc2)
-        mccs2.append(mccs2)
-        difference_acc = bal_acc1 - bal_acc2
-        difference_mcc = mcc1 - mcc2
+        metrics1 = au.get_cm_metrics(grouped_cms1[i])
+        accs1.append(metrics1.balanced_accuracy)
+        mccs1.append(metrics1.mcc)
+        metrics2 = au.get_cm_metrics(grouped_cms2[i])
+        accs2.append(metrics2.balanced_accuracy)
+        mccs2.append(metrics2.mcc)
+        difference_acc = metrics1.balanced_accuracy - metrics2.balanced_accuracy
+        difference_mcc = metrics1.mcc - metrics2.mcc
         differences_between_accs.append(difference_acc)
         differences_between_mccs.append(difference_mcc)
 
+    print(differences_between_accs)
+    print(differences_between_mccs)
+    # print(accs1)
+    # print(accs2)
     differences_times, times1, times2 = [], [], []
     for i in range(len(grouped_resp_times1)):
         if len(grouped_resp_times1[i]) != 0 and len(grouped_resp_times2[i]) != 0:
@@ -361,8 +202,15 @@ def analyze_individual_cms_from_two_groups(data:quant.UserQuantData, data_groupi
             differences_times.append(difference)
     
     # Perform the Wilcoxon Signed-Rank Test
-    statistic_mcc, pvalue_mcc = stats.wilcoxon(differences_between_mccs)
-    statistic_acc, pvalue_acc = stats.wilcoxon(differences_between_accs)
+    if 0 in differences_between_mccs:
+        print("Zero in mccs")
+    if 0 in differences_between_accs:
+        print("Zero in accs")
+    differences_between_mccs_no_zeros = remove_zeros(differences_between_mccs)
+    differences_between_accs_no_zeros = remove_zeros(differences_between_accs)
+    print(differences_between_mccs_no_zeros, differences_between_accs_no_zeros)
+    statistic_mcc, pvalue_mcc = stats.wilcoxon(differences_between_mccs_no_zeros)
+    statistic_acc, pvalue_acc = stats.wilcoxon(differences_between_accs_no_zeros)
     statistic_times, pvalue_times = stats.wilcoxon(differences_times)
 
 
@@ -371,39 +219,288 @@ def analyze_individual_cms_from_two_groups(data:quant.UserQuantData, data_groupi
     print("Times Test statistic:", statistic_times, "P-value:", pvalue_times)
 
     group_num_list = range(1, 3)
-    plt.boxplot([accs1, accs2])
-    plt.title("Balanced Accuracy Values vs LED Status")
-    plt.xlabel("LED Status")
+    plt.boxplot([accs1, accs2], showmeans=True)
+    plt.title("Balanced Accuracy Values vs Feedback")
+    plt.xlabel("Feedback")
     plt.ylabel("Balanced Accuracy")
-    plt.xticks(group_num_list, [f"Group {i}" for i in group_num_list])
+    plt.xticks(group_num_list, ["Have Feedback", "No Feedback"])
     plt.show()
 
-    plt.boxplot([differences_between_accs])
-    plt.title("Balanced Accuracy Values vs LED Status")
-    plt.xlabel("LED Status")
+    plt.boxplot([mccs1, mccs2], showmeans=True)
+    plt.title("MCC Values vs Feedback")
+    plt.xlabel("Feedback")
+    plt.ylabel("MCC")
+    plt.xticks(group_num_list, ["Have Feedback", "No Feedback"])
+    plt.show()
+
+    plt.boxplot([differences_between_accs], showmeans=True)
+    plt.title("Balanced Accuracy Differences by Feedback")
+    plt.xlabel("Feedback")
     plt.ylabel("Balanced Accuracy")
     # plt.xticks(1, "Difference Between Paired Balanced Accuracies")
     plt.show()
 
+    plt.boxplot([differences_between_mccs], showmeans=True)
+    plt.title("MCC Differences by Feedback")
+    plt.xlabel("Feedback")
+    plt.ylabel("MCC")
+    # plt.xticks(1, "Difference Between Paired Balanced Accuracies")
+    plt.show()
+
     group_num_list = range(1, 3)
-    plt.boxplot([times1, times2])
-    plt.title("Response Times vs LED Status")
-    plt.xlabel("LED Status")
+    plt.boxplot([times1, times2], showmeans=True)
+    plt.title("Response Times vs Feedback")
+    plt.xlabel("Feedback")
     plt.ylabel("time (s)")
-    plt.xticks(group_num_list, [f"Group {i}" for i in group_num_list])
+    plt.xticks(group_num_list, ["Have Feedback", "No Feedback"])
     plt.show()
 
     return statistic_acc, pvalue_acc, statistic_times, pvalue_times
 
+def plot_each_metric(x_ticks_list, acc, bal_acc, f1, mcc):
+    plt.boxplot(acc, showmeans=True)
+    plt.title("Accuracy vs Video Type")
+    plt.xlabel("Video Type")
+    plt.ylabel("Accuracy")
+    plt.xticks(x_ticks_list)
+    plt.show()
+
+    plt.boxplot(bal_acc, showmeans=True)
+    plt.title("Balanced Accuracy vs Video Type")
+    plt.xlabel("Video Type")
+    plt.ylabel("Balanced Accuracy")
+    plt.xticks(x_ticks_list)
+    plt.show()
+
+    plt.boxplot(f1, showmeans=True)
+    plt.title("F1 Score vs Video Type")
+    plt.xlabel("Video Type")
+    plt.ylabel("F1 Score")
+    plt.xticks(x_ticks_list)
+    plt.show()
+
+    plt.boxplot(mcc, showmeans=True)
+    plt.title("MCC vs Video Type")
+    plt.xlabel("Video Type")
+    plt.ylabel("MCC")
+    plt.xticks(x_ticks_list)
+    plt.show()
+
+def get_strs_from_faults_present(faults_present, num_faults):
+    if faults_present == au.FaultType.NO_FAULTS_PRESENT:
+        if num_faults != 0:
+            raise ValueError("Should have no faults for no faults present!!!")
+        return ("NONE", "NONE")
+    elif faults_present == au.FaultType.PROX_FAULT:
+        if num_faults == 1:
+            return ("PROX", "NONE")
+        elif num_faults == 2:
+            return ("PROX", "PROX")
+        else:
+            raise ValueError("Only one or two faults should be present")
+    elif faults_present == au.FaultType.WHEEL_FAULT:
+        if num_faults == 1:
+            return ("WHEEL", "NONE")
+        elif num_faults == 2:
+            return ("WHEEL", "WHEEL")
+        else:
+            raise ValueError("Only one or two faults should be present")
+    elif faults_present == au.FaultType.WHEEL_AND_PROX_FAULT:
+        if num_faults != 2:
+            raise ValueError("Should have 2 faults present!!!")
+        return ("WHEEL", "PROX")
+    else:
+        raise ValueError(f"Got bad faults present: {faults_present}")
+
+def create_csv_with_responses_and_vars(data):
+    # bal_acc = [[] for _ in range(au.NUM_VIDEOS)]
+    # faults = deepcopy(bal_acc)
+    # Create a sample DataFrame
+    columns = ['user_num', 'fault_type1', 'fault_type2', 'bal_acc', 'vid_type']
+    df = pd.DataFrame(columns=columns)
+    k = 0
+    for i in range(len(data)):
+        for j in range(len(data[i].video_experiments)):
+            bal_acc = data[i].video_experiments[j].performance_metrics.balanced_accuracy
+            vid_type = data[i].video_experiments[j].metadata.video_type
+            faults_present = data[i].video_experiments[j].faults_present
+            num_faults = data[i].video_experiments[j].metadata.num_faults
+            faults_strs = get_strs_from_faults_present(faults_present, num_faults)
+            user_num = data[i].user_number
+            # Add a new row as a dictionary
+            new_row = {'user_num': user_num, 'fault_type1': faults_strs[0], 'fault_type2': faults_strs[1], 'bal_acc': bal_acc, 'vid_type': vid_type}
+            df.loc[k] = new_row
+            k += 1
+
+    # Save the DataFrame to a CSV file
+    df.to_csv('data.csv', index=False)
+
+
+def plot_each_video_type(data):
+    acc = [[] for _ in range(au.NUM_VIDEOS)]
+    bal_acc, f1, mcc = deepcopy(acc), deepcopy(acc), deepcopy(acc)
+    for i in range(len(data)):
+        for j in range(len(data[i].video_experiments)):
+            metrics = data[i].video_experiments[j].performance_metrics
+            vid_type = data[i].video_experiments[j].metadata.video_type
+            acc[vid_type-1].append(metrics.accuracy)
+            bal_acc[vid_type-1].append(metrics.balanced_accuracy)
+            f1[vid_type-1].append(metrics.f1_score)
+            mcc[vid_type-1].append(metrics.mcc)
+    
+    group_num_list = range(1, au.NUM_VIDEOS+1)
+    plot_each_metric(group_num_list, acc, bal_acc, f1, mcc)
+
+
+def generate_wilcoxon_results_from_lists(lists):
+    stats_bundle = [[] for _ in range(len(lists))]
+    for i in range(len(lists)):
+        stat, pval = stats.wilcoxon(remove_zeros(lists[i]))
+        stats_bundle[i].append((stat, pval))
+    return stats_bundle
+
+def get_averages_from_group(metrics_list, small_idxs, large_idxs):
+    small_diffs = [(metrics_list[index]-metrics_list[index+2]) for index in small_idxs]
+    large_diffs = [(metrics_list[index]-metrics_list[index+2]) for index in large_idxs]
+    small_avg, large_avg = statistics.mean(small_diffs), statistics.mean(large_diffs)
+    return small_avg, large_avg
+
+
+def plot_each_difference(data, average_it):
+    average_acc_diff = [[], []]
+    average_bal_acc_diff, average_f1_diff, average_mcc_diff = deepcopy(average_acc_diff), deepcopy(average_acc_diff), deepcopy(average_acc_diff)
+    acc_diff = [[] for _ in range(int(au.NUM_VIDEOS/2))]
+    bal_acc_diff, f1_diff, mcc_diff = deepcopy(acc_diff), deepcopy(acc_diff), deepcopy(acc_diff)
+    accepted_list_users = list(range(14, 44))
+    accepted_list_users.append(3)
+    accepted_list_users.append(10)
+    print(accepted_list_users)
+    for i in range(len(data)):  # range(len(data))
+        if i not in accepted_list_users:
+            continue
+        acc = [None for _ in range(au.NUM_VIDEOS)]
+        bal_acc, f1, mcc = deepcopy(acc), deepcopy(acc), deepcopy(acc)
+        for j in range(len(data[i].video_experiments)):
+            metrics = data[i].video_experiments[j].performance_metrics
+            vid_type = data[i].video_experiments[j].metadata.video_type
+            if acc[vid_type-1] is None:
+                acc[vid_type-1] = metrics.accuracy
+                bal_acc[vid_type-1] = metrics.balanced_accuracy
+                f1[vid_type-1] = metrics.f1_score
+                mcc[vid_type-1] = metrics.mcc
+            else:
+                acc[vid_type-1] = (acc[vid_type-1] + metrics.accuracy) / 2
+                bal_acc[vid_type-1] = (bal_acc[vid_type-1] + metrics.balanced_accuracy) / 2
+                f1[vid_type-1] = (f1[vid_type-1] + metrics.f1_score) / 2
+                mcc[vid_type-1] = (mcc[vid_type-1] + metrics.mcc) / 2
+        small_idxs, large_idxs = [], []
+        for j in range(int(au.NUM_VIDEOS/4)):
+            index = j*4
+            NUM_SIZES = 2
+            for k in range(NUM_SIZES):
+                if acc[index+k] is not None and acc[index+2+k] is not None:
+                    if average_it:
+                        if k == 0:
+                            small_idxs.append(index+k)
+                        else:
+                            large_idxs.append(index+k)
+                    acc_diff[j*2+k].append(acc[index+k]-acc[index+2+k])
+                    bal_acc_diff[j*2+k].append(bal_acc[index+k]-bal_acc[index+2+k])
+                    f1_diff[j*2+k].append(f1[index+k]-f1[index+2+k])
+                    mcc_diff[j*2+k].append(mcc[index+k]-mcc[index+2+k])
+        
+        if average_it:
+            acc_avg_sm, acc_avg_lg = get_averages_from_group(acc, small_idxs, large_idxs)
+            bal_acc_avg_sm, bal_acc_avg_lg = get_averages_from_group(bal_acc, small_idxs, large_idxs)
+            f1_avg_sm, f1_avg_lg = get_averages_from_group(f1, small_idxs, large_idxs)
+            mcc_avg_sm, mcc_avg_lg = get_averages_from_group(mcc, small_idxs, large_idxs)
+            average_acc_diff[0].append(acc_avg_sm)
+            average_acc_diff[1].append(acc_avg_lg)
+            average_bal_acc_diff[0].append(bal_acc_avg_sm)
+            average_bal_acc_diff[1].append(bal_acc_avg_lg)
+            average_f1_diff[0].append(f1_avg_sm)
+            average_f1_diff[1].append(f1_avg_lg)
+            average_mcc_diff[0].append(mcc_avg_sm)
+            average_mcc_diff[1].append(mcc_avg_lg)
+
+    if average_it:
+        group_num_list = range(1, int((au.NUM_VIDEOS/6))+1)
+        acc_stats = generate_wilcoxon_results_from_lists(average_acc_diff)
+        bal_acc_stats = generate_wilcoxon_results_from_lists(average_bal_acc_diff)
+        f1_stats = generate_wilcoxon_results_from_lists(average_f1_diff)
+        mcc_stats = generate_wilcoxon_results_from_lists(average_mcc_diff) 
+    else:                     
+        group_num_list = range(1, int((au.NUM_VIDEOS/2))+1)
+        acc_stats = generate_wilcoxon_results_from_lists(acc_diff)
+        bal_acc_stats = generate_wilcoxon_results_from_lists(bal_acc_diff)
+        f1_stats = generate_wilcoxon_results_from_lists(f1_diff)
+        mcc_stats = generate_wilcoxon_results_from_lists(mcc_diff)
+
+
+    print("Acc stats:", acc_stats)
+    print("Bal Acc stats:", bal_acc_stats)
+    print("F1 stats:", f1_stats)
+    print("Mcc stats:", mcc_stats)
+
+    if average_it:
+        plot_each_metric(group_num_list, average_acc_diff, average_bal_acc_diff, average_f1_diff, average_mcc_diff)
+    else:
+        plot_each_metric(group_num_list, acc_diff, bal_acc_diff, f1_diff, mcc_diff)
+
+def plot_each_fault_type(data):
+    acc_diff = [[] for _ in range(int(au.NUM_VIDEOS/2))]
+    bal_acc_diff, f1_diff, mcc_diff = deepcopy(acc_diff), deepcopy(acc_diff), deepcopy(acc_diff)
+    accepted_list_users = list(range(14, 44))
+    accepted_list_users.append(3)
+    accepted_list_users.append(10)
+    print(accepted_list_users)
+    for i in range(len(data)):
+        if i not in accepted_list_users:
+            continue
+        acc = [None for _ in range(au.NUM_VIDEOS)]
+        bal_acc, f1, mcc = deepcopy(acc), deepcopy(acc), deepcopy(acc)
+        for j in range(len(data[i].video_experiments)):
+            metrics = data[i].video_experiments[j].performance_metrics
+            print(metrics)
+            vid_type = data[i].video_experiments[j].metadata.video_type
+            if acc[vid_type-1] is None:
+                acc[vid_type-1] = metrics.accuracy
+                bal_acc[vid_type-1] = metrics.balanced_accuracy
+                f1[vid_type-1] = metrics.f1_score
+                mcc[vid_type-1] = metrics.mcc
+            else:
+                acc[vid_type-1] = (acc[vid_type-1] + metrics.accuracy) / 2
+                bal_acc[vid_type-1] = (bal_acc[vid_type-1] + metrics.balanced_accuracy) / 2
+                f1[vid_type-1] = (f1[vid_type-1] + metrics.f1_score) / 2
+                mcc[vid_type-1] = (mcc[vid_type-1] + metrics.mcc) / 2
+        for j in range(int(au.NUM_VIDEOS/4)):
+            index = j*4
+            NUM_SIZES = 2
+            for k in range(NUM_SIZES):
+                if acc[index+k] is not None and acc[index+2+k] is not None:
+                    acc_diff[j*2+k].append(acc[index+k]-acc[index+2+k])
+                    bal_acc_diff[j*2+k].append(bal_acc[index+k]-bal_acc[index+2+k])
+                    f1_diff[j*2+k].append(f1[index+k]-f1[index+2+k])
+                    mcc_diff[j*2+k].append(mcc[index+k]-mcc[index+2+k])
+                    
+    
+    group_num_list = range(1, int((au.NUM_VIDEOS/2))+1)
+    plot_each_metric(group_num_list, acc_diff, bal_acc_diff, f1_diff, mcc_diff)
 
 
 def main():
     ### Get data
-    quant_filename = '../data/user_study_user_data/quantitative_raw_results.csv'
-    qual_filename = '../data/user_study_user_data/qualitative_raw_results.csv'
+    QUANT_FILENAME = '../data/user_study_user_data/quantitative_raw_results.csv'
+    QUAL_FILENAME = '../data/user_study_user_data/qualitative_raw_results.csv'
+    REMOVE_BEACON_GUESSES = True
+    REMOVE_REVOKED = True
 
-    quant_data = quant.extract_quant_data_from_csv(quant_filename)
-    qual_data = qual.extract_qual_data_from_csv(qual_filename)
+    quant_data = quant.get_quant_data_from_csv(QUANT_FILENAME, REMOVE_BEACON_GUESSES, REMOVE_REVOKED)
+    qual_data = qual.extract_qual_data_from_csv(QUAL_FILENAME)
+
+    AVERAGE_IT = True
+    create_csv_with_responses_and_vars(quant_data)
+    # plot_each_video_type(quant_data)
 
 
     ### Qual Analysis
@@ -432,9 +529,12 @@ def main():
 
     ### Quant Analysis
     LEDS_ON_VIDEO_TYPES = (1, 2, 5, 6, 9, 10)
-    LEDS_OFF_VIDEO_TYPES = (2, 3, 7, 8, 11, 12)
+    LEDS_OFF_VIDEO_TYPES = (3, 4, 7, 8, 11, 12)
+    LEDS_ON_AND_SMALL_TYPES = (1, 5, 9)
+    LEDS_ON_AND_LARGE_TYPES = (2, 6, 10)
+    LEDS_OFF_AND_SMALL_TYPES = (3, 7, 11)
+    LEDS_OFF_AND_LARGE_TYPES = (4, 8, 12)
     ALL_VIDEO_TYPES = tuple(range(12))
-    populated_data = populate_cm_for_each_experiment(quant_data)
 
     # ### BY_USER_THEN_VIDEO_TYPE: trust and leds on
     # type_lists = [LEDS_ON_VIDEO_TYPES, LEDS_OFF_VIDEO_TYPES]
@@ -442,25 +542,34 @@ def main():
 
     ### First Group vs Second Group
     guinea_pigs = range(1, 15)
-    normal = range(15, 35)
+    normal = range(15, au.NUM_USERS)
     groupings_halves = ListsOfGroupings(user_lists=[guinea_pigs, normal])
 
     ### Individual Users
-    all_users = [range(1,35)]
-    all_users_individually = [[i] for i in range(1, 35)]
+    all_users = [range(1,au.NUM_USERS)]
+    all_users_individually = [[i] for i in range(1, au.NUM_USERS)]  # list(range(1, 5)) + list(range(6,au.NUM_USERS))
     guinea_pigs_individually = [[j] for j in range(1, 15)]
-    normal_individually = [[k] for k in range(15, 35)]
-    groupings = ListsOfGroupings(type_lists=[LEDS_ON_VIDEO_TYPES, LEDS_OFF_VIDEO_TYPES], user_lists=trust_nums)
+    normal_individually = [[k] for k in range(15, au.NUM_USERS)]
+    leds_types_list = [LEDS_ON_VIDEO_TYPES, LEDS_OFF_VIDEO_TYPES]
+    leds_and_sizes_type_lists = [LEDS_ON_AND_SMALL_TYPES, LEDS_ON_AND_LARGE_TYPES, LEDS_OFF_AND_SMALL_TYPES, LEDS_OFF_AND_LARGE_TYPES]
+    groupings = ListsOfGroupings(type_lists=leds_and_sizes_type_lists, user_lists=trust_nums)
 
     # gather_data_and_visualize_multiple_groups_of_data(populated_data, DataGroupingType.BY_USER, groupings_halves)
 
+    trouble_makers = [[12], [15]]
 
     groupings_leds_on = ListsOfGroupings(type_lists=[LEDS_ON_VIDEO_TYPES], user_lists=all_users_individually)
     groupings_leds_off = ListsOfGroupings(type_lists=[LEDS_OFF_VIDEO_TYPES], user_lists=all_users_individually)
 
     groupings_guinea_pigs = ListsOfGroupings(user_lists=guinea_pigs_individually)
 
-    all_stats = analyze_individual_cms_from_two_groups(populated_data, DataGroupingType.BY_USER_THEN_VIDEO_TYPE, groupings_leds_on, groupings_leds_off)
+    # all_stats = analyze_individual_cms_from_two_groups(quant_data, DataGroupingType.BY_USER_THEN_VIDEO_TYPE, groupings_leds_on, groupings_leds_off)
+
+    # print(quant_data[2].user_number)
+    # print(quant_data[2].video_experiments[9].metadata.user_watch_order)
+    # print(quant_data[2].video_experiments[9].metadata.video_type)
+    # cm, rts = populate_confusion_matrix(quant_data[2].video_experiments[9])
+    # print(cm)
 
     
 
@@ -480,11 +589,11 @@ def main():
     # print(acc_leds_off, f1_leds_off, mcc_leds_off)
 
 
-    # plt.boxplot(grouped_response_times)
+    # plt.boxplot(grouped_response_times, showmeans=True)
     # plt.title("Response Times (Human)")
-    # plt.xlabel("LED Status")
+    # plt.xlabel("Feedback")
     # plt.ylabel("time (s)")
-    # plt.xticks([1, 2], ["LEDs On", "LEDs Off"])
+    # plt.xticks([1, 2], ["Have Feedback", "No Feedback"])
     # plt.show()
 
     # Calculate true positive rate:

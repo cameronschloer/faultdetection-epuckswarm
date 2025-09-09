@@ -1,18 +1,24 @@
 from collections import namedtuple
 from dataclasses import dataclass
 from enum import Enum
+import numpy as np
 
 NUM_VIDEOS = 12
-NUM_USERS = 34
+NUM_USERS = 44
 UNKNOWN_STR = "unknown"
 NA_STR = "nada"
+NONE_STR = "NONE"
 MAX_NUM_ERRORS = 2
+
 
 class FaultType(Enum):
 	WHEEL_FAULT = 0
 	PROX_FAULT = 1
-	OTHER_VALID_FAULT = 2
+	OTHER_FAULT = 2
 	NOT_A_FAULT = 3
+	WHEEL_AND_PROX_FAULT = 4
+	TYPE_NOT_GIVEN = 5
+	NO_FAULTS_PRESENT = 6
 
 @dataclass
 class ConfusionMatrix:
@@ -23,6 +29,13 @@ class ConfusionMatrix:
 	revoked_false_positives: int = 0
 	revoked_true_positives: int = 0
 	total_robots: int = 0
+
+@dataclass
+class PerformanceMetrics:
+	accuracy: float = None
+	balanced_accuracy: float = None
+	mcc: float = None
+	f1_score: float = None
 
 @dataclass
 class ClassificationsOfCMs:
@@ -77,6 +90,103 @@ class ClassificationsOfCMs:
 	# The swarm will have less false negatives than the humans
 
 Dataline = namedtuple("Dataline", "time robot tolerators attackers")
+
+def calculate_balanced_accuracy(tp, tn, fp, fn):
+	"""Calculates balanced accuracy.
+
+	Args:
+		tp: True positives.
+		tn: True negatives.
+		fp: False positives.
+		fn: False negatives.
+
+	Returns:
+		Balanced accuracy when at least one tp or fn value exists and at least one tn or fp value exists.
+
+		Ignores inconsequential part. 
+		Sensitivity is meaningless when there are no possible true positives, only true negative values (non-faulty robots) in the experiment since there are no tp or fn regardless of what the classifier does. 
+		Speicificity is meaningless when there are no possible true negatives, only true positive values (faulty robots) in the experiment since there are no tn or fp regardless of what the classifier does.
+	"""
+
+	use_sensitivity = True
+	if tp == 0 and fn == 0:
+		use_sensitivity = False
+	else:
+		sensitivity = tp / (tp + fn)
+	
+	if tn == 0 and fp == 0:
+		if use_sensitivity:
+			return sensitivity
+		else:
+			raise ValueError("ERROR: \"calculate_balanced_accuracy\" received zero values for all values. Nothing to calculate.")
+	else:
+		specificity = tn / (tn + fp)
+		if not use_sensitivity:
+			return specificity
+
+	balanced_accuracy = (sensitivity + specificity) / 2
+	return balanced_accuracy
+
+def calc_accuracy(tp, tn, total):
+	try:
+		accuracy = (tp+tn)/total
+		return accuracy
+	except ZeroDivisionError:
+		print("WARNING: No accuracy could be found, division by Zero")
+		print(f"tp: {tp}, tn: {tn}")
+		raise ValueError("Total should not be zero ever")
+
+def calc_f1_score(tp, fp, fn, tn):
+	try:
+		f1_score = (2*tp) / (2*tp + fp + fn)
+		return f1_score
+	except ZeroDivisionError:
+		if tn > 0:
+			print("WARNING: No F-Score could be found, division by Zero, but true negatives were present, so accuracy of 1 was awarded since all robots were correctly categorized")
+			return 1
+		else:
+			raise ValueError("ERROR: No values in confusion matrix, nothing to calculate")
+	
+
+def calc_matthews_coefficient(tp, fp, fn, tn):
+	"""Calculates the Matthews correlation coefficient (MCC).
+
+	Args:
+		tp (int): True positives.
+		fp (int): False positives.
+		tn (int): True negatives.
+		fn (int): False negatives.
+
+	Returns:
+		float: The Matthews correlation coefficient.
+	"""
+
+	numerator = (tp * tn) - (fp * fn)
+	denominator = np.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn))
+
+	if denominator == 0:
+		print("WARNING: MCC undefined: returning MCC adjusted balanced accuracy")
+		return 2 * calculate_balanced_accuracy(tp, tn, fp, fn) - 1  # This projects the accuracy to the MCC's range of -1 to 1
+
+	mcc = numerator / denominator
+
+	if mcc == 0:
+		print(f"Returned zero in mcc with these values: tp: {tp}, fp: {fp}, fn: {fn}, tn: {tn}")
+	return mcc
+
+def get_cm_metrics(cm):
+	tp = cm.true_positives
+	tn = cm.true_negatives
+	fp = cm.false_positives
+	fn = cm.false_negatives
+	total = cm.total_robots
+
+	accuracy = calc_accuracy(tp, tn, total)
+	bal_acc = calculate_balanced_accuracy(tp, tn, fp, fn)
+	f1_score = calc_f1_score(tp, fp, fn, tn)
+	mcc = calc_matthews_coefficient(tp, fp, fn, tn)
+
+	return PerformanceMetrics(accuracy=accuracy, balanced_accuracy=bal_acc, mcc=mcc, f1_score=f1_score)
 
 def find_swarm_size_by_video_type(video_type):
 	LARGE_NUM_ROBOTS = 64

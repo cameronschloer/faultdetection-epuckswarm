@@ -6,3 +6,4 @@ old*
 experiments/scale/will_old*
 experiments/fault_scale
 __pycache__
+.Rproj.user
