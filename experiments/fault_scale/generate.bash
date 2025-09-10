@@ -6,7 +6,7 @@ for fault in "FAULT_PROXIMITYSENSORS_SETRANDOM" "FAULT_ACTUATOR_LWHEEL_SETZERO";
     mkdir $fault
     cd $fault
     # This is for the number of faulty robots
-    for n in {1..10}; do
+    for n in {1..16}; do
         mkdir $n
         cd $n
         ln -s ../../../../build build
