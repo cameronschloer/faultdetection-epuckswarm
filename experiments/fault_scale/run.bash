@@ -5,7 +5,7 @@ seed=1000
 for fault in "FAULT_PROXIMITYSENSORS_SETRANDOM" "FAULT_ACTUATOR_LWHEEL_SETZERO"; do
     cd $fault
     # This is for the number of faulty robots
-    for n in {1..10}; do
+    for n in {1..16}; do
         cd $n
         # this is for the number of iterations
         for iter in {1..20}; do

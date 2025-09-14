@@ -1,7 +1,6 @@
 import pandas as pd
 import analysis_utils as au
-from dataclasses import dataclass
-
+from dataclasses import dataclass, field
 NUM_DUPLICATE_VIDEOS = 2
 NUM_EXPERIMENT_COLUMNS = 3
 REVOKE_STR = "-Revoke"
@@ -40,9 +39,9 @@ class VideoExperiment:
 	true_values: list[FaultyRobotGuess]
 	faults_present: au.FaultType = None
 	response_times: list[float] = None
-	metadata: VideoMetadata = VideoMetadata()
-	confusion_matrix: au.ConfusionMatrix = au.ConfusionMatrix()
-	performance_metrics: au.PerformanceMetrics = au.PerformanceMetrics()
+	metadata: VideoMetadata = field(default_factory=lambda: VideoMetadata())
+	confusion_matrix: au.ConfusionMatrix = field(default_factory=lambda: au.ConfusionMatrix())
+	performance_metrics: au.PerformanceMetrics = field(default_factory=lambda: au.PerformanceMetrics())
 
 @dataclass   
 class UserQuantData:

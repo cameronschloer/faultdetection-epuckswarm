@@ -1,6 +1,7 @@
 import pandas as pd
 import analysis_utils as au
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
 
 
 PREQUESTIONNAIRE_STR = "Pre-Questionnaire"
@@ -43,11 +44,11 @@ class BoolAndComment:
 
 @dataclass
 class PreQuestionnaire:
-	robotics_years: NumAndComment = NumAndComment()
-	video_games_years: NumAndComment = NumAndComment()
-	stem_years: NumAndComment = NumAndComment()
-	help: BoolAndComment = BoolAndComment()
-	harm: BoolAndComment = BoolAndComment()
+	robotics_years: NumAndComment = field(default_factory=lambda: NumAndComment())
+	video_games_years: NumAndComment = field(default_factory=lambda: NumAndComment())
+	stem_years: NumAndComment = field(default_factory=lambda: NumAndComment())
+	help: BoolAndComment = field(default_factory=lambda: BoolAndComment())
+	harm: BoolAndComment = field(default_factory=lambda: BoolAndComment())
 
 
 @dataclass
@@ -59,24 +60,24 @@ class NasaTlxScale:
 
 @dataclass   
 class PostQuestionnaire:
-	mental_demand: NasaTlxScale = NasaTlxScale()
-	physical_demand: NasaTlxScale = NasaTlxScale()
-	temporal_demand: NasaTlxScale = NasaTlxScale()
-	performance: NasaTlxScale = NasaTlxScale()
-	effort: NasaTlxScale = NasaTlxScale()
-	frustration: NasaTlxScale = NasaTlxScale()
-	feedback_usefulness: NumAndComment = NumAndComment()
-	feedback_ease_of_understanding: NumAndComment = NumAndComment()
-	trust_of_feedback: NumAndComment = NumAndComment()
-	finding_faulty_difficulty: NumAndComment = NumAndComment()
+	mental_demand: NasaTlxScale = field(default_factory=lambda: NasaTlxScale())
+	physical_demand: NasaTlxScale = field(default_factory=lambda: NasaTlxScale())
+	temporal_demand: NasaTlxScale = field(default_factory=lambda: NasaTlxScale())
+	performance: NasaTlxScale = field(default_factory=lambda: NasaTlxScale())
+	effort: NasaTlxScale = field(default_factory=lambda: NasaTlxScale())
+	frustration: NasaTlxScale = field(default_factory=lambda: NasaTlxScale())
+	feedback_usefulness: NumAndComment = field(default_factory=lambda: NumAndComment())
+	feedback_ease_of_understanding: NumAndComment = field(default_factory=lambda: NumAndComment())
+	trust_of_feedback: NumAndComment = field(default_factory=lambda: NumAndComment())
+	finding_faulty_difficulty: NumAndComment = field(default_factory=lambda: NumAndComment())
 	improve_interface: str = None
 	other_comments_or_questions: str = None
 
 
 @dataclass   
 class UserQualData:
-	pre_questionnaire: PreQuestionnaire = PreQuestionnaire()
-	post_questionnaire: PostQuestionnaire = PostQuestionnaire()
+	pre_questionnaire: PreQuestionnaire = field(default_factory=lambda: PreQuestionnaire())
+	post_questionnaire: PostQuestionnaire = field(default_factory=lambda: PostQuestionnaire())
 	user_number: int = None
 
 
